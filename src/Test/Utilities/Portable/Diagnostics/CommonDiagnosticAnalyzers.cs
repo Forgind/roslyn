@@ -1814,6 +1814,29 @@ namespace Microsoft.CodeAnalysis
         }
 
         [DiagnosticAnalyzer(LanguageNames.CSharp, LanguageNames.VisualBasic)]
+        public sealed class DiagnosticSuppressorForId_ThrowsOperationCancelledException : DiagnosticSuppressor
+        {
+            public CancellationTokenSource CancellationTokenSource { get; } = new CancellationTokenSource();
+            public SuppressionDescriptor SuppressionDescriptor { get; }
+            public DiagnosticSuppressorForId_ThrowsOperationCancelledException(string suppressedDiagnosticId)
+            {
+                SuppressionDescriptor = new SuppressionDescriptor(
+                    id: "SPR0001",
+                    suppressedDiagnosticId: suppressedDiagnosticId,
+                    justification: $"Suppress {suppressedDiagnosticId}");
+            }
+
+            public override ImmutableArray<SuppressionDescriptor> SupportedSuppressions
+                => ImmutableArray.Create(SuppressionDescriptor);
+
+            public override void ReportSuppressions(SuppressionAnalysisContext context)
+            {
+                CancellationTokenSource.Cancel();
+                context.CancellationToken.ThrowIfCancellationRequested();
+            }
+        }
+
+        [DiagnosticAnalyzer(LanguageNames.CSharp, LanguageNames.VisualBasic)]
         public sealed class DiagnosticSuppressorThrowsExceptionFromSupportedSuppressions : DiagnosticSuppressor
         {
             private readonly NotImplementedException _exception;
@@ -1966,6 +1989,7 @@ namespace Microsoft.CodeAnalysis
             }
 
             public const string RuleId = "ID1";
+            public const string RuleCategory = "Category1";
             private readonly DiagnosticDescriptor _rule;
             private readonly AnalysisKind _analysisKind;
             private readonly GeneratedCodeAnalysisFlags _analysisFlags;
@@ -1982,7 +2006,7 @@ namespace Microsoft.CodeAnalysis
                     RuleId,
                     "Title1",
                     "Symbol: {0}",
-                    "Category1",
+                    RuleCategory,
                     defaultSeverity: DiagnosticSeverity.Warning,
                     isEnabledByDefault: true,
                     customTags: customTags);

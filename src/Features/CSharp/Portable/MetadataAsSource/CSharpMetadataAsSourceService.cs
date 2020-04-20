@@ -16,7 +16,6 @@ using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.Formatting.Rules;
 using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.MetadataAsSource;
-using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.Simplification;
 using Roslyn.Utilities;
 
@@ -55,11 +54,9 @@ namespace Microsoft.CodeAnalysis.CSharp.MetadataAsSource
         }
 
         protected override IEnumerable<AbstractFormattingRule> GetFormattingRules(Document document)
-        {
-            return s_memberSeparationRule.Concat(Formatter.GetDefaultFormattingRules(document));
-        }
+            => s_memberSeparationRule.Concat(Formatter.GetDefaultFormattingRules(document));
 
-        protected override async Task<Document> ConvertDocCommentsToRegularComments(Document document, IDocumentationCommentFormattingService docCommentFormattingService, CancellationToken cancellationToken)
+        protected override async Task<Document> ConvertDocCommentsToRegularCommentsAsync(Document document, IDocumentationCommentFormattingService docCommentFormattingService, CancellationToken cancellationToken)
         {
             var syntaxRoot = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
 
@@ -117,15 +114,13 @@ namespace Microsoft.CodeAnalysis.CSharp.MetadataAsSource
                 return FormattingOperations.CreateAdjustNewLinesOperation(GetNumberOfLines(triviaList) + 1, AdjustNewLinesOption.ForceLines);
             }
 
-            public override void AddAnchorIndentationOperations(List<AnchorIndentationOperation> list, SyntaxNode node, OptionSet optionSet, in NextAnchorIndentationOperationAction nextOperation)
+            public override void AddAnchorIndentationOperations(List<AnchorIndentationOperation> list, SyntaxNode node, in NextAnchorIndentationOperationAction nextOperation)
             {
                 return;
             }
 
             protected override bool IsNewLine(char c)
-            {
-                return SyntaxFacts.IsNewLine(c);
-            }
+                => SyntaxFacts.IsNewLine(c);
         }
     }
 }

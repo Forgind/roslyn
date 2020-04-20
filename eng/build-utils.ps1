@@ -25,7 +25,7 @@ function GetProjectOutputBinary([string]$fileName, [string]$projectName = "", [s
 
 function GetPublishData() {
   if (Test-Path variable:global:_PublishData) {
-  return $global:_PublishData
+    return $global:_PublishData
   }
 
   Write-Host "Downloading $PublishDataUrl"
@@ -38,9 +38,9 @@ function GetBranchPublishData([string]$branchName) {
   $data = GetPublishData
 
   if (Get-Member -InputObject $data.branches -Name $branchName) {
-  return $data.branches.$branchName
+    return $data.branches.$branchName
   } else {
-  return $null
+    return $null
   }
 }
 
@@ -48,9 +48,9 @@ function GetReleasePublishData([string]$releaseName) {
   $data = GetPublishData
 
   if (Get-Member -InputObject $data.releases -Name $releaseName) {
-  return $data.releases.$releaseName
+    return $data.releases.$releaseName
   } else {
-  return $null
+    return $null
   }
 }
 
@@ -159,7 +159,45 @@ function Exec-Script([string]$script, [string]$scriptArgs = "") {
 
 # Ensure the proper .NET Core SDK is available. Returns the location to the dotnet.exe.
 function Ensure-DotnetSdk() {
-  return Join-Path (InitializeDotNetCli -install:$true) "dotnet.exe"
+  $dotnetInstallDir = (InitializeDotNetCli -install:$true)
+  $dotnetTestPath = Join-Path $dotnetInstallDir "dotnet.exe"
+  if (Test-Path -Path $dotnetTestPath) {
+    return $dotnetTestPath
+  }
+
+  $dotnetTestPath = Join-Path $dotnetInstallDir "dotnet"
+  if (Test-Path -Path $dotnetTestPath) {
+    return $dotnetTestPath
+  }
+
+  throw "Could not find dotnet executable in $dotnetInstallDir"
+}
+
+# Walks up the source tree, starting at the given file's directory, and returns a FileInfo object for the first .csproj file it finds, if any.
+function Get-ProjectFile([object]$fileInfo) {
+  Push-Location
+
+  Set-Location $fileInfo.Directory
+  try {
+    while ($true) {
+      # search up from the current file for a folder containing a csproj
+      $files = Get-ChildItem *.csproj
+      if ($files) {
+        return $files[0]
+      }
+      else {
+        $location = Get-Location
+        Set-Location ..
+        if ((Get-Location).Path -eq $location.Path) {
+          # our location didn't change. We must be at the drive root, so give up
+          return $null
+        }
+      }
+    }
+  }
+  finally {
+    Pop-Location
+  }
 }
 
 function Get-VersionCore([string]$name, [string]$versionFile) {
@@ -287,31 +325,4 @@ function Make-BootstrapBuild([switch]$force32 = $false) {
   Run-MSBuild $projectPath "/t:Clean" -logFileName "BootstrapClean"
 
   return $dir
-}
-
-Add-Type -AssemblyName 'System.Drawing'
-Add-Type -AssemblyName 'System.Windows.Forms'
-function Capture-Screenshot($path) {
-  $width = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width
-  $height = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height
-
-  $bitmap = New-Object System.Drawing.Bitmap $width, $height
-  try {
-    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-    try {
-      $graphics.CopyFromScreen( `
-        [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.X, `
-        [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Y, `
-        0, `
-        0, `
-        $bitmap.Size, `
-        [System.Drawing.CopyPixelOperation]::SourceCopy)
-    } finally {
-      $graphics.Dispose()
-    }
-
-    $bitmap.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
-  } finally {
-    $bitmap.Dispose()
-  }
 }

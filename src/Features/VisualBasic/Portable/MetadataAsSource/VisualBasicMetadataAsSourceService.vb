@@ -10,7 +10,6 @@ Imports Microsoft.CodeAnalysis.Formatting
 Imports Microsoft.CodeAnalysis.Formatting.Rules
 Imports Microsoft.CodeAnalysis.Host
 Imports Microsoft.CodeAnalysis.MetadataAsSource
-Imports Microsoft.CodeAnalysis.Options
 Imports Microsoft.CodeAnalysis.Simplification
 Imports Microsoft.CodeAnalysis.VisualBasic
 Imports Microsoft.CodeAnalysis.VisualBasic.Simplification
@@ -52,7 +51,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.MetadataAsSource
             Return document.WithSyntaxRoot(newRoot)
         End Function
 
-        Protected Overrides Async Function ConvertDocCommentsToRegularComments(document As Document, docCommentFormattingService As IDocumentationCommentFormattingService, cancellationToken As CancellationToken) As Task(Of Document)
+        Protected Overrides Async Function ConvertDocCommentsToRegularCommentsAsync(document As Document, docCommentFormattingService As IDocumentationCommentFormattingService, cancellationToken As CancellationToken) As Task(Of Document)
             Dim syntaxRoot = Await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(False)
 
             Dim newSyntaxRoot = DocCommentConverter.ConvertToRegularComments(syntaxRoot, docCommentFormattingService, cancellationToken)
@@ -108,7 +107,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.MetadataAsSource
                 Return FormattingOperations.CreateAdjustNewLinesOperation(GetNumberOfLines(triviaList) + 1, AdjustNewLinesOption.ForceLines)
             End Function
 
-            Public Overrides Sub AddAnchorIndentationOperationsSlow(list As List(Of AnchorIndentationOperation), node As SyntaxNode, optionSet As OptionSet, ByRef nextOperation As NextAnchorIndentationOperationAction)
+            Public Overrides Sub AddAnchorIndentationOperationsSlow(list As List(Of AnchorIndentationOperation), node As SyntaxNode, ByRef nextOperation As NextAnchorIndentationOperationAction)
                 Return
             End Sub
 

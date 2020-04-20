@@ -4,7 +4,6 @@
 
 Imports System.Collections.Immutable
 Imports System.Threading
-Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.FindSymbols
 Imports Microsoft.CodeAnalysis.Host
@@ -14,6 +13,7 @@ Imports Microsoft.CodeAnalysis.Rename
 Imports Microsoft.CodeAnalysis.Rename.ConflictEngine
 Imports Microsoft.CodeAnalysis.Simplification
 Imports Microsoft.CodeAnalysis.Text
+Imports Microsoft.CodeAnalysis.VisualBasic.Simplification
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Imports Microsoft.CodeAnalysis.VisualBasic.Utilities
@@ -21,7 +21,7 @@ Imports Microsoft.CodeAnalysis.VisualBasic.Utilities
 Namespace Microsoft.CodeAnalysis.VisualBasic.Rename
 
     Friend Class VisualBasicRenameRewriterLanguageService
-        Implements IRenameRewriterLanguageService
+        Inherits AbstractRenameRewriterLanguageService
 
         Private ReadOnly _languageServiceProvider As HostLanguageServices
 
@@ -31,7 +31,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Rename
 
 #Region "Annotate"
 
-        Public Function AnnotateAndRename(parameters As RenameRewriterParameters) As SyntaxNode Implements IRenameRewriterLanguageService.AnnotateAndRename
+        Public Overrides Function AnnotateAndRename(parameters As RenameRewriterParameters) As SyntaxNode
             Dim renameRewriter = New RenameRewriter(parameters)
             Return renameRewriter.Visit(parameters.SyntaxRoot)
         End Function
@@ -565,7 +565,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Rename
                         ' or the replacement itself is escaped.
                         newToken = newToken.WithAdditionalAnnotations(Simplifier.Annotation)
                     Else
-                        newToken = Simplification.VisualBasicSimplificationService.TryEscapeIdentifierToken(newToken)
+                        newToken = TryEscapeIdentifierToken(newToken)
                     End If
                 End If
 
@@ -655,16 +655,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Rename
 
 #Region "Declaration Conflicts"
 
-        Public Function LocalVariableConflict(
+        Public Overrides Function LocalVariableConflict(
             token As SyntaxToken,
-            newReferencedSymbols As IEnumerable(Of ISymbol)
-            ) As Boolean Implements IRenameRewriterLanguageService.LocalVariableConflict
+            newReferencedSymbols As IEnumerable(Of ISymbol)) As Boolean
 
             ' This scenario is not present in VB and only in C#
             Return False
         End Function
 
-        Public Function ComputeDeclarationConflictsAsync(
+        Public Overrides Function ComputeDeclarationConflictsAsync(
             replacementText As String,
             renamedSymbol As ISymbol,
             renameSymbol As ISymbol,
@@ -673,7 +672,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Rename
             newSolution As Solution,
             reverseMappedLocations As IDictionary(Of Location, Location),
             cancellationToken As CancellationToken
-        ) As Task(Of ImmutableArray(Of Location)) Implements IRenameRewriterLanguageService.ComputeDeclarationConflictsAsync
+        ) As Task(Of ImmutableArray(Of Location))
 
             Dim conflicts = ArrayBuilder(Of Location).GetInstance()
 
@@ -747,7 +746,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Rename
                 conflicts.AddRange(
                     DeclarationConflictHelpers.GetMembersWithConflictingSignatures(DirectCast(renamedSymbol, IPropertySymbol), trimOptionalParameters:=True) _
                         .Select(Function(loc) reverseMappedLocations(loc)))
-                ConflictResolver.AddConflictingParametersOfProperties(
+                AddConflictingParametersOfProperties(
                     referencedSymbols.Select(Function(s) s.Symbol).Concat(renameSymbol).Where(Function(sym) sym.Kind = SymbolKind.Property),
                     renamedSymbol.Name,
                     conflicts)
@@ -780,10 +779,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Rename
             Return Task.FromResult(conflicts.ToImmutableAndFree())
         End Function
 
-        Public Async Function ComputeImplicitReferenceConflictsAsync(
+        Public Overrides Async Function ComputeImplicitReferenceConflictsAsync(
                 renameSymbol As ISymbol, renamedSymbol As ISymbol,
                 implicitReferenceLocations As IEnumerable(Of ReferenceLocation),
-                cancellationToken As CancellationToken) As Task(Of ImmutableArray(Of Location)) Implements IRenameRewriterLanguageService.ComputeImplicitReferenceConflictsAsync
+                cancellationToken As CancellationToken) As Task(Of ImmutableArray(Of Location))
 
             ' Handle renaming of symbols used for foreach
             Dim implicitReferencesMightConflict = renameSymbol.Kind = SymbolKind.Property AndAlso
@@ -819,7 +818,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Rename
         ''' statement of this lambda.
         ''' </summary>
         ''' <param name="token">The token to get the complexification target for.</param>
-        Public Function GetExpansionTargetForLocation(token As SyntaxToken) As SyntaxNode Implements IRenameRewriterLanguageService.GetExpansionTargetForLocation
+        Public Overrides Function GetExpansionTargetForLocation(token As SyntaxToken) As SyntaxNode
             Return GetExpansionTarget(token)
         End Function
 
@@ -857,7 +856,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Rename
         End Function
 
 #Region "Helper Methods"
-        Public Function IsIdentifierValid(replacementText As String, syntaxFactsService As ISyntaxFactsService) As Boolean Implements IRenameRewriterLanguageService.IsIdentifierValid
+        Public Overrides Function IsIdentifierValid(replacementText As String, syntaxFactsService As ISyntaxFactsService) As Boolean
             replacementText = SyntaxFacts.MakeHalfWidthIdentifier(replacementText)
             Dim possibleIdentifier As String
             If syntaxFactsService.IsTypeCharacter(replacementText.Last()) Then
@@ -881,12 +880,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Rename
             Return True
         End Function
 
-        Public Function ComputePossibleImplicitUsageConflicts(
+        Public Overrides Function ComputePossibleImplicitUsageConflicts(
             renamedSymbol As ISymbol,
             semanticModel As SemanticModel,
             originalDeclarationLocation As Location,
             newDeclarationLocationStartingPosition As Integer,
-            cancellationToken As CancellationToken) As ImmutableArray(Of Location) Implements IRenameRewriterLanguageService.ComputePossibleImplicitUsageConflicts
+            cancellationToken As CancellationToken) As ImmutableArray(Of Location)
 
             ' TODO: support other implicitly used methods like dispose
             If CaseInsensitiveComparison.Equals(renamedSymbol.Name, "MoveNext") OrElse
@@ -954,7 +953,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Rename
             Return ImmutableArray(Of Location).Empty
         End Function
 
-        Public Sub TryAddPossibleNameConflicts(symbol As ISymbol, replacementText As String, possibleNameConflicts As ICollection(Of String)) Implements IRenameRewriterLanguageService.TryAddPossibleNameConflicts
+        Public Overrides Sub TryAddPossibleNameConflicts(symbol As ISymbol, replacementText As String, possibleNameConflicts As ICollection(Of String))
             Dim halfWidthReplacementText = SyntaxFacts.MakeHalfWidthIdentifier(replacementText)
 
             Const AttributeSuffix As String = "Attribute"
